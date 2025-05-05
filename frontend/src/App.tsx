@@ -22,7 +22,6 @@ const InstructorLogin = lazy(
 const Adminlogin = lazy(() => import("@/components/auth/pages/AdminLogin"));
 
 const VerifyEmail = lazy(() => import("@/components/utils/VerifyEmail"));
-
 // === Lazy Loaded dashboard Components ===
 const StudentLayout = lazy(
   () => import("@/components/dashboard/students/_components/StudentLayout.tsx"),
