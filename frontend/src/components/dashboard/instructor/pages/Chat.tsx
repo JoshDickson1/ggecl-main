@@ -1,610 +1,171 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  FaPaperPlane,
-  FaBars,
-  FaTimes,
-  FaImage,
-  FaSpinner,
-} from "react-icons/fa";
-import socketService from "@/socket/socketService";
-import { formatDistanceToNow } from "date-fns";
-import { useChatData } from "@/hooks/useChatData";
-import { useAuth } from "@/hooks/useAuth";
-import { GroupItem } from "../../admin/pages/GroupItem";
-import { useInstructor } from "@/hooks/useInstructor";
+import { useState } from "react";
+import { FaBars, FaPaperPlane, FaTimes } from "react-icons/fa";
 
-interface Message {
-  text: string | null;
+type User = {
+  name: string;
+  message: string;
+  time: string;
+  active: boolean;
+};
+
+type Group = {
+  name: string;
+  users: User[];
+};
+
+type Message = {
+  text: string;
   sender: string;
-  senderId: string;
-  role: "admin" | "student" | "instructor";
-  timestamp?: number;
-  image?: string | null;
-}
+};
 
-interface Group {
-  groupId: string;
-  groupName: string;
-  adminId: string;
-  students: string[];
-  instructors?: string[];
-  messages?: Message[];
-  lastMessageTime?: Date | null;
-}
+const groups: Group[] = [
+  {
+    name: "Admins",
+    users: [
+      {
+        name: "Jane Cooper",
+        message: "Ready for the meeting?",
+        time: "just now",
+        active: true,
+      },
+      {
+        name: "John Doe",
+        message: "Just finished the task.",
+        time: "5m",
+        active: false,
+      },
+    ],
+  },
+  {
+    name: "Instructors",
+    users: [
+      {
+        name: "Jenny Wilson",
+        message: "Thank you so much, sir",
+        time: "2m",
+        active: false,
+      },
+      {
+        name: "Marvin McKinney",
+        message: "You're welcome",
+        time: "4m",
+        active: false,
+      },
+    ],
+  },
+];
 
 const ChatApp = () => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [newMessage, setNewMessage] = useState("");
-  const [image, setImage] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<{
-    [groupId: string]: string[];
-  }>({});
-
-  const { instructor } = useInstructor();
-  const { userId, role } = useAuth();
-
-  const { groupsData, loading, messages } = useChatData(selectedGroup?.groupId);
-
-  // console.log("ggId", selectedGroup?.groupId);
-
-  useEffect(() => {
-    // console.log("Groups data updated:", groupsData);
-    // console.log("Groups data loading:", loading);
-    // console.log("Groups data message", messages);
-  }, [groupsData, messages, selectedGroup]);
-
-  useEffect(() => {
-    if (!Array.isArray(messages)) return;
-    if (!selectedGroup?.groupId) return;
-
-    // Filter and transform messages in one step
-    const groupMessages = messages
-      .filter((msg) => msg.group === selectedGroup.groupId)
-      .map((msg) => ({
-        text: msg.text ?? null,
-        sender: msg.sender,
-        senderId: msg.senderId,
-        role: msg.role as "admin" | "student" | "instructor",
-        timestamp: new Date(msg.createdAt).getTime(),
-        image: msg.image,
-      }));
-
-    // Only update if we have messages
-    if (groupMessages.length > 0) {
-      setSelectedGroup((prev) => ({
-        ...prev!,
-        messages: groupMessages,
-        lastMessageTime: new Date(
-          groupMessages[groupMessages.length - 1].timestamp,
-        ),
-      }));
-    }
-  }, [messages, selectedGroup?.groupId]);
-
-  // Join groups when groups data is loaded
-  useEffect(() => {
-    if (userId && groups.length > 0) {
-      const groupIds = groups.map((g) => g.groupId);
-      socketService.emit("joinGroups", { groupIds, instructor: userId });
-    }
-  }, [userId, groups]);
-
-  // Scroll to bottom of messages
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [userId, selectedGroup?.groupId]);
-
-  // Initialize socket and load groups
-  useEffect(() => {
-    socketService.connect(instructor._id.toString());
-
-    const loadInitialGroups = () => {
-      try {
-        setGroups(
-          groupsData.map((group) => ({
-            ...group,
-            groupId: group.groupId,
-            groupName: group.name,
-            adminId: group.admin,
-            students: group.students,
-            instructors: group.instructors,
-          })),
-        );
-        // if (groups.length > 0) {
-        //   setSelectedGroup(groups[0]);
-        // }
-      } catch (err) {
-        setError("Failed to load groups");
-      }
-    };
-
-    loadInitialGroups();
-
-    return () => {
-      socketService.disconnect();
-    };
-  }, [userId, groupsData]);
-
-  // Handle sending messages
-  const sendMessage = useCallback(async () => {
-    if (!selectedGroup || (!newMessage.trim() && !image)) return;
-
-    setIsSending(true);
-
-    try {
-      const messageData = {
-        text: newMessage,
-        image: image || undefined,
-      };
-
-      if (
-        (!messageData.text || !messageData.text.trim()) &&
-        !messageData.image
-      ) {
-        throw new Error("Message or image must be provided");
-      }
-
-      // Send via socket - wait for socket response to update UI
-      await socketService.emit(
-        "sendMessage",
-        {
-          groupId: selectedGroup.groupId,
-          senderId: userId,
-          role: role,
-          sender: instructor?.fullName || "Student",
-          text: messageData.text,
-          image: messageData.image,
-        },
-        (response: { success: boolean; error?: string }) => {
-          if (!response.success) {
-            throw new Error(response.error || "Failed to send message");
-          }
-          // Clear input only on success
-          setNewMessage("");
-          setImage(null);
-          setImagePreview(null);
-        },
-      );
-    } catch (error) {
-      console.error("Failed to send message:", error);
-    } finally {
-      setIsSending(false);
-    }
-  }, [selectedGroup, newMessage, image, userId, role]);
-
-  // Handle real-time updates
-  useEffect(() => {
-    const handleGroupCreated = (newGroup: Group) => {
-      const transformedGroup = {
-        ...newGroup,
-        messages: newGroup.messages || [],
-        lastMessageTime: newGroup.lastMessageTime || null,
-      };
-
-      setGroups((prev) => [...prev, transformedGroup]);
-
-      if (userId && newGroup.instructors?.includes(userId)) {
-        setSelectedGroup(transformedGroup);
-        // console.log("checked");
-      }
-    };
-
-    const handleNewMessage = (data: {
-      groupId: string;
-      senderId: string;
-      role: "admin" | "student" | "instructor";
-      sender: string;
-      text: string | null;
-      image: string | null;
-    }) => {
-      const message: Message = {
-        text: data.text,
-        sender: data.sender,
-        senderId: data.senderId,
-        role: data.role,
-        timestamp: Date.now(),
-        image: data.image,
-      };
-
-      // Update groups state
-      setGroups((prev) =>
-        prev.map((group) =>
-          group.groupId === data.groupId
-            ? {
-                ...group,
-                messages: [...(group.messages || []), message],
-                lastMessageTime: new Date(),
-              }
-            : group,
-        ),
-      );
-
-      // Update selected group if it's the current one
-      if (selectedGroup?.groupId === data.groupId) {
-        setSelectedGroup((prev) =>
-          prev
-            ? {
-                ...prev,
-                messages: [...(prev.messages || []), message],
-                lastMessageTime: new Date(),
-              }
-            : null,
-        );
-      }
-    };
-
-    const handleTyping = (data: {
-      groupId: string;
-      userId: string;
-      userName: string;
-    }) => {
-      setTypingUsers((prev) => {
-        const groupTypingUsers = prev[data.groupId] || [];
-        if (!groupTypingUsers.includes(data.userName)) {
-          return {
-            ...prev,
-            [data.groupId]: [...groupTypingUsers, data.userName],
-          };
-        }
-        return prev;
-      });
-
-      setTimeout(() => {
-        setTypingUsers((prev) => {
-          const groupTypingUsers = prev[data.groupId] || [];
-          return {
-            ...prev,
-            [data.groupId]: groupTypingUsers.filter(
-              (name) => name !== data.userName,
-            ),
-          };
-        });
-      }, 3000);
-    };
-
-    socketService.on("groupCreated", handleGroupCreated);
-    socketService.on("message", handleNewMessage);
-    socketService.on("typing", handleTyping);
-
-    return () => {
-      socketService.off("groupCreated", handleGroupCreated);
-      socketService.off("message", handleNewMessage);
-      socketService.off("typing", handleTyping);
-    };
-  }, [userId, selectedGroup?.groupId]); // Only include selectedGroup.groupId as dependency
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [selectedGroup?.messages, scrollToBottom]);
-
-  // Rest of the component remains the same...
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = () => {
-    setImagePreview(null);
-    setImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    } else if (selectedGroup) {
-      socketService.emit("typing", {
-        groupId: selectedGroup.groupId,
-        userId: userId,
-        userName: instructor?.fullName || "Student",
-      });
-    }
-  };
-
-  const visibleGroups = groups.filter(
-    (group) => userId && group.instructors?.includes(userId),
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(groups[0]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(
+    selectedGroup?.users[0] || null,
   );
+  const [messages, setMessages] = useState<Message[]>([
+    { text: "Hello and thanks for signing up...", sender: "Jane" },
+    { text: "Hello, Good Evening.", sender: "You" },
+    { text: "I'm Zafor", sender: "You" },
+    { text: "I only have a small doubt...", sender: "You" },
+    { text: "Yeah sure, tell me zafor", sender: "Jane" },
+  ]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const formatTime = (timestamp?: number) => {
-    if (!timestamp) return "";
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    setMessages([...messages, { text: newMessage, sender: "You" }]);
+    setNewMessage("");
   };
-
-  const groupMessagesByDate = (messages: Message[] = []) => {
-    const grouped: { [date: string]: Message[] } = {};
-
-    messages.forEach((message) => {
-      const date = new Date(message.timestamp || 0).toLocaleDateString();
-      if (!grouped[date]) {
-        grouped[date] = [];
-      }
-      grouped[date].push(message);
-    });
-
-    return grouped;
-  };
-
-  const groupedMessages = groupMessagesByDate(selectedGroup?.messages);
 
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100">
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        onChange={handleImageChange}
-        className="hidden"
-      />
-
+    <div className="flex h-screen text-gray-600">
       {/* Sidebar */}
       <div
-        className={`fixed z-20 h-full w-64 border-r border-gray-200 bg-white p-4 shadow-lg transition-transform duration-300 ease-in-out md:static md:z-0 md:w-80 md:translate-x-0 dark:border-gray-700 dark:bg-gray-800 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed h-full w-64 border-r border-gray-50 bg-white p-4 shadow-md transition-transform duration-300 ease-in-out md:static md:w-1/3 dark:border-gray-950 dark:bg-gray-900 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Chat Groups</h2>
+        <h2 className="mb-4 flex items-center justify-between text-2xl font-bold">
+          Groups
           <button
-            className="text-xl text-gray-500 md:hidden"
+            className="text-xl md:hidden"
             onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
           >
             <FaTimes />
           </button>
-        </div>
+        </h2>
 
-        <div className="mt-4">
-          {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <FaSpinner className="h-8 w-8 animate-spin text-blue-500" />
-            </div>
-          ) : error ? (
-            <div className="p-4 text-center text-red-500">{error}</div>
-          ) : visibleGroups.length > 0 ? (
+        <div className="h-96 space-y-2 overflow-y-auto">
+          {groups.map((group, index) => (
             <div
-              className="mt-4 space-y-2 overflow-y-auto"
-              style={{ maxHeight: "calc(100vh - 180px)" }}
+              key={index}
+              onClick={() => {
+                setSelectedGroup(group);
+                setSelectedUser(group.users[0]);
+                setSidebarOpen(false);
+              }}
+              className={`flex cursor-pointer items-center rounded-md p-3 transition-all duration-200 hover:bg-blue-100 ${selectedGroup?.name === group.name ? "bg-blue-200" : ""}`}
             >
-              {visibleGroups.map((group) => (
-                <div
-                  key={group.groupId}
-                  onClick={() => {
-                    setSelectedGroup(group);
-                    setSidebarOpen(false);
-                  }}
-                  className={`flex cursor-pointer items-center rounded-lg p-3 transition-colors duration-200 ${
-                    selectedGroup?.groupId === group.groupId
-                      ? "bg-blue-100 dark:bg-gray-700"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-semibold text-white">
-                    {group.groupName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="ml-3 flex-1 overflow-hidden">
-                    <p className="truncate font-medium">{group.groupName}</p>
-                    <GroupItem
-                      key={group.groupId}
-                      group={group.groupId}
-                      fullName={group.groupName}
-                      role={role || "student"}
-                    />
-                  </div>
-                  {group.messages && group.messages.length > 0 && (
-                    <span className="ml-2 text-xs text-gray-400">
-                      {formatTime(
-                        group.messages[group.messages.length - 1].timestamp,
-                      )}
-                    </span>
-                  )}
-                </div>
-              ))}
+              <p className="font-semibold">{group.name}</p>
             </div>
-          ) : (
-            <div className="flex h-64 items-center justify-center">
-              <p className="text-gray-500">You haven't joined any groups yet</p>
-            </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="relative flex flex-1 flex-col overflow-hidden">
+      {/* Main Chat Section */}
+      <div className="flex flex-1 flex-col">
         {/* Chat Header */}
-        <div className="flex items-center border-b border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center border-b border-gray-200 p-4 shadow-md dark:border-gray-900">
           <button
-            className="mr-3 text-xl text-gray-500 md:hidden"
+            className="mr-3 text-xl md:hidden"
             onClick={() => setSidebarOpen(true)}
-            aria-label="Open sidebar"
           >
             <FaBars />
           </button>
-          {selectedGroup ? (
-            <>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-semibold text-white">
-                {selectedGroup.groupName.charAt(0).toUpperCase()}
-              </div>
-              <div className="ml-3">
-                <h2 className="text-lg font-semibold">
-                  {selectedGroup.groupName}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedGroup.students.length} member
-                  {selectedGroup.students.length !== 1 ? "s" : ""}
-                  {typingUsers[selectedGroup.groupId]?.length > 0 && (
-                    <span className="ml-2 text-blue-500">
-                      {typingUsers[selectedGroup.groupId].join(", ")} typing...
-                    </span>
-                  )}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="ml-3">
-              <h2 className="text-lg font-semibold">No group selected</h2>
-            </div>
-          )}
+          <div className="h-12 w-12 rounded-full bg-gray-800"></div>
+          <div className="ml-3">
+            <h2 className="text-lg font-semibold">{selectedUser?.name}</h2>
+            <p
+              className={`text-sm ${selectedUser?.active ? "text-green-500" : "text-gray-400"}`}
+            >
+              {selectedUser?.active ? "Active Now" : "Offline"}
+            </p>
+          </div>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900">
-          {selectedGroup ? (
-            <>
-              {Object.entries(groupedMessages).map(([date, messages]) => (
-                <div key={date}>
-                  <div className="mb-4 flex justify-center">
-                    <span className="rounded-full bg-white px-3 py-1 text-sm text-gray-500 shadow dark:bg-gray-800 dark:text-gray-400">
-                      {new Date(date).toLocaleDateString([], {
-                        weekday: "long",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {messages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={`flex ${
-                          msg.senderId !== userId
-                            ? "justify-start"
-                            : "justify-end"
-                        }`}
-                      >
-                        <div
-                          className={`flex max-w-xs flex-col rounded-xl px-4 py-2 ${
-                            msg.senderId === userId
-                              ? "bg-blue-600 text-white"
-                              : "bg-white text-gray-800 shadow dark:bg-gray-700 dark:text-gray-200"
-                          }`}
-                        >
-                          <p className="text-xs font-semibold">
-                            {msg.senderId === userId ? "You" : msg.sender}
-                          </p>
-                          {msg.image ? (
-                            <div className="my-2">
-                              <img
-                                src={msg.image}
-                                alt="Message attachment"
-                                className="max-h-60 rounded-md object-cover"
-                              />
-                            </div>
-                          ) : null}
-                          <p className="py-1">{msg.text}</p>
-                          <span
-                            className={`text-xs ${
-                              msg.senderId === userId
-                                ? "text-blue-100"
-                                : "text-gray-500 dark:text-gray-400"
-                            }`}
-                          >
-                            {formatTime(msg.timestamp)}
-                            {" • "}
-                            {formatDistanceToNow(new Date(msg.timestamp || 0), {
-                              addSuffix: true,
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <p className="text-gray-500 dark:text-gray-400">
-                  Select a group to start chatting
-                </p>
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="mt-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 md:hidden"
-                >
-                  Browse groups
-                </button>
+        {/* Chat Messages */}
+        <div className="flex-1 space-y-3 overflow-y-auto bg-gray-100 p-6 dark:bg-gray-800">
+          <div className="mb-4 flex justify-center">
+            <span className="rounded-full bg-white px-3 py-1 text-sm text-gray-500 dark:bg-gray-900">
+              Today
+            </span>
+          </div>
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`flex ${msg.sender === "You" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-xs rounded-lg px-4 py-2 ${msg.sender === "You" ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-600 dark:border-gray-950 dark:text-gray-400"}`}
+              >
+                {msg.text}
               </div>
             </div>
-          )}
+          ))}
         </div>
 
         {/* Message Input */}
-        <div className="border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          {imagePreview && (
-            <div className="relative mb-3">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="h-32 rounded-md object-cover"
-              />
-              <button
-                onClick={removeImage}
-                className="absolute top-2 right-2 rounded-full bg-gray-800 p-1 text-white opacity-75 hover:opacity-100"
-                aria-label="Remove image"
-              >
-                <FaTimes className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          <div className="flex rounded-md shadow-sm">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-l-md bg-gray-100 px-3 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
-              aria-label="Attach image"
-            >
-              <FaImage />
-            </button>
-            <input
-              type="text"
-              placeholder={
-                selectedGroup
-                  ? "Type your message..."
-                  : "Select a group to chat"
-              }
-              className="flex-1 border border-gray-300 p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={!selectedGroup}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={
-                !selectedGroup || (!newMessage.trim() && !image) || isSending
-              }
-              className="rounded-r-md bg-blue-600 px-4 text-white hover:bg-blue-700 disabled:bg-gray-400 dark:bg-blue-700 dark:hover:bg-blue-800 dark:disabled:bg-gray-600"
-              aria-label="Send message"
-            >
-              {isSending ? (
-                <FaSpinner className="h-4 w-4 animate-spin" />
-              ) : (
-                <FaPaperPlane />
-              )}
-            </button>
-          </div>
+        <div className="flex border-t border-gray-200 p-4 shadow-md dark:border-gray-900">
+          <input
+            type="text"
+            placeholder="Type your message..."
+            className="flex-1 rounded-md border p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+          />
+          <button
+            onClick={sendMessage}
+            className="ml-2 rounded-md bg-blue-600 p-3 text-white transition-all duration-200 hover:bg-blue-700"
+          >
+            <FaPaperPlane />
+          </button>
         </div>
       </div>
     </div>

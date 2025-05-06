@@ -8,16 +8,12 @@ import {
 } from "react-icons/fa";
 import socketService from "@/socket/socketService";
 import { formatDistanceToNow } from "date-fns";
-import { useChatData } from "@/hooks/useChatData";
-import { useStudent } from "@/hooks/useStudent";
-import { useAuth } from "@/hooks/useAuth";
-import { GroupItem } from "../../admin/pages/GroupItem";
 
 interface Message {
   text: string | null;
   sender: string;
   senderId: string;
-  role: "admin" | "student" | "instructor";
+  role: "admin" | "student";
   timestamp?: number;
   image?: string | null;
 }
@@ -33,13 +29,14 @@ interface Group {
 }
 
 const StudentChat = () => {
-  // const currentUserId = "student2";
-  // const currentUserRole = "student";
+  const currentUserId = "student2";
+  const currentUserRole = "student";
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [image, setImage] = useState<string | null>(null);
@@ -50,84 +47,60 @@ const StudentChat = () => {
     [groupId: string]: string[];
   }>({});
 
-  const { student } = useStudent();
-  const { userId, role } = useAuth();
-
-  // // console.log(useStudents(p));
-
-  const { groupsData, loading, messages } = useChatData(selectedGroup?.groupId);
-
-  // console.log("ggId", selectedGroup?.groupId);
-
-  useEffect(() => {
-    // console.log("Groups data updated:", groupsData);
-    // console.log("Groups data loading:", loading);
-    // console.log("Groups data message", messages);
-  }, [groupsData, messages, selectedGroup]);
-
-  useEffect(() => {
-    if (!Array.isArray(messages)) return;
-    if (!selectedGroup?.groupId) return;
-
-    // Filter and transform messages in one step
-    const groupMessages = messages
-      .filter((msg) => msg.group === selectedGroup.groupId)
-      .map((msg) => ({
-        text: msg.text ?? null,
-        sender: msg.sender,
-        senderId: msg.senderId,
-        role: msg.role as "admin" | "student" | "instructor",
-        timestamp: new Date(msg.createdAt).getTime(),
-        image: msg.image,
-      }));
-
-    // Only update if we have messages
-    if (groupMessages.length > 0) {
-      setSelectedGroup((prev) => ({
-        ...prev!,
-        messages: groupMessages,
-        lastMessageTime: new Date(
-          groupMessages[groupMessages.length - 1].timestamp,
-        ),
-      }));
-    }
-  }, [messages, selectedGroup?.groupId]);
-
   // Join groups when groups data is loaded
   useEffect(() => {
-    if (userId && groups.length > 0) {
+    if (currentUserId && groups.length > 0) {
       const groupIds = groups.map((g) => g.groupId);
-      socketService.emit("joinGroups", { groupIds, studentId: userId });
+      socketService.emit("joinGroups", { groupIds, studentId: currentUserId });
     }
-  }, [userId, groups]);
+  }, [currentUserId, groups]);
 
   // Scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [userId, selectedGroup?.groupId]);
+  }, []);
 
   // Initialize socket and load groups
   useEffect(() => {
-    socketService.connect(student._id.toString());
+    socketService.connect(currentUserId);
 
     const loadInitialGroups = () => {
-      try {
-        setGroups(
-          groupsData.map((group) => ({
-            ...group,
-            groupId: group.groupId,
-            groupName: group.name,
-            adminId: group.admin,
-            students: group.students,
-            instructors: group.instructors,
-          })),
-        );
-        // if (groups.length > 0) {
-        //   setSelectedGroup(groups[0]);
-        // }
-      } catch (err) {
-        setError("Failed to load groups");
-      }
+      setIsLoading(true);
+      setError(null);
+
+      // Mock initial groups - replace with actual API call
+      setTimeout(() => {
+        try {
+          const initialGroups: Group[] = [
+            {
+              groupId: "group1",
+              groupName: "React Learners",
+              adminId: "admin1",
+              students: ["student1", "student2"],
+              instructors: ["inst1"],
+              messages: [], // Start with empty messages array
+              lastMessageTime: null,
+            },
+            {
+              groupId: "group2",
+              groupName: "Next.js Pros",
+              adminId: "admin1",
+              students: ["student1", "student2"],
+              messages: [], // Start with empty messages array
+              lastMessageTime: null,
+            },
+          ];
+
+          setGroups(initialGroups);
+          if (initialGroups.length > 0) {
+            setSelectedGroup(initialGroups[0]);
+          }
+        } catch (err) {
+          setError("Failed to load groups");
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500);
     };
 
     loadInitialGroups();
@@ -135,7 +108,7 @@ const StudentChat = () => {
     return () => {
       socketService.disconnect();
     };
-  }, [userId, groupsData]);
+  }, [currentUserId]);
 
   // Handle sending messages
   const sendMessage = useCallback(async () => {
@@ -161,9 +134,9 @@ const StudentChat = () => {
         "sendMessage",
         {
           groupId: selectedGroup.groupId,
-          senderId: userId,
-          role: role,
-          sender: student?.fullName || "Student",
+          senderId: currentUserId,
+          role: currentUserRole,
+          sender: currentUserId,
           text: messageData.text,
           image: messageData.image,
         },
@@ -182,7 +155,7 @@ const StudentChat = () => {
     } finally {
       setIsSending(false);
     }
-  }, [selectedGroup, newMessage, image, userId, role]);
+  }, [selectedGroup, newMessage, image, currentUserId, currentUserRole]);
 
   // Handle real-time updates
   useEffect(() => {
@@ -195,9 +168,8 @@ const StudentChat = () => {
 
       setGroups((prev) => [...prev, transformedGroup]);
 
-      if (userId && newGroup.students.includes(userId)) {
+      if (newGroup.students.includes(currentUserId)) {
         setSelectedGroup(transformedGroup);
-        // console.log("checked");
       }
     };
 
@@ -283,7 +255,7 @@ const StudentChat = () => {
       socketService.off("message", handleNewMessage);
       socketService.off("typing", handleTyping);
     };
-  }, [userId, selectedGroup?.groupId]); // Only include selectedGroup.groupId as dependency
+  }, [currentUserId, selectedGroup?.groupId]); // Only include selectedGroup.groupId as dependency
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -318,14 +290,14 @@ const StudentChat = () => {
     } else if (selectedGroup) {
       socketService.emit("typing", {
         groupId: selectedGroup.groupId,
-        userId: userId,
-        userName: student?.fullName || "Student",
+        userId: currentUserId,
+        userName: "Student",
       });
     }
   };
 
-  const visibleGroups = groups.filter(
-    (group) => userId && group.students.includes(userId),
+  const visibleGroups = groups.filter((group) =>
+    group.students.includes(currentUserId),
   );
 
   const formatTime = (timestamp?: number) => {
@@ -380,7 +352,7 @@ const StudentChat = () => {
         </div>
 
         <div className="mt-4">
-          {loading ? (
+          {isLoading ? (
             <div className="flex h-64 items-center justify-center">
               <FaSpinner className="h-8 w-8 animate-spin text-blue-500" />
             </div>
@@ -409,12 +381,20 @@ const StudentChat = () => {
                   </div>
                   <div className="ml-3 flex-1 overflow-hidden">
                     <p className="truncate font-medium">{group.groupName}</p>
-                    <GroupItem
-                      key={group.groupId}
-                      group={group.groupId}
-                      fullName={group.groupName}
-                      role={role || "student"}
-                    />
+                    <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                      {group.messages && group.messages.length > 0
+                        ? `${
+                            group.messages[group.messages.length - 1]
+                              .senderId === currentUserId
+                              ? "You"
+                              : group.messages[group.messages.length - 1].sender
+                          }: ${
+                            group.messages[group.messages.length - 1].image
+                              ? "📷 Image"
+                              : group.messages[group.messages.length - 1].text
+                          }`
+                        : "No messages yet"}
+                    </p>
                   </div>
                   {group.messages && group.messages.length > 0 && (
                     <span className="ml-2 text-xs text-gray-400">
@@ -492,20 +472,22 @@ const StudentChat = () => {
                       <div
                         key={i}
                         className={`flex ${
-                          msg.senderId !== userId
+                          msg.senderId !== currentUserId
                             ? "justify-start"
                             : "justify-end"
                         }`}
                       >
                         <div
                           className={`flex max-w-xs flex-col rounded-xl px-4 py-2 ${
-                            msg.senderId === userId
+                            msg.senderId === currentUserId
                               ? "bg-blue-600 text-white"
                               : "bg-white text-gray-800 shadow dark:bg-gray-700 dark:text-gray-200"
                           }`}
                         >
                           <p className="text-xs font-semibold">
-                            {msg.senderId === userId ? "You" : msg.sender}
+                            {msg.senderId === currentUserId
+                              ? "You"
+                              : msg.sender}
                           </p>
                           {msg.image ? (
                             <div className="my-2">
@@ -519,7 +501,7 @@ const StudentChat = () => {
                           <p className="py-1">{msg.text}</p>
                           <span
                             className={`text-xs ${
-                              msg.senderId === userId
+                              msg.senderId === currentUserId
                                 ? "text-blue-100"
                                 : "text-gray-500 dark:text-gray-400"
                             }`}

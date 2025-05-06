@@ -65,7 +65,7 @@ const refreshAccessToken = async (instance: AxiosInstance): Promise<string> => {
 
     const { response } = formatAxiosError(error);
     console.error(response);
-    throw new Error(response?.message || "Token refresh failed");
+    throw new Error(response?.message);
   }
 };
 
@@ -83,9 +83,7 @@ export const createAxiosInstance = (): AxiosInstance => {
   // Request interceptor: attach token for non‑public endpoints.
   instance.interceptors.request.use((config) => {
     const token = getAccessToken();
-    const isPublic = PUBLIC_URLS.some((url) =>
-      config.url?.startsWith(url)
-    );    
+    const isPublic = PUBLIC_URLS.some((url) => config.url === url);
     if (token && config.headers && !isPublic) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -180,9 +178,7 @@ export const authProvider = {
     return response.data;
   },
   refreshAccessToken: async (): Promise<string> => {
-    const token = await refreshAccessToken(axiosInstance);
-    setAccessToken(token);
-    return token;
+    return await refreshAccessToken(axiosInstance);
   },
   logout: async (signal?: AbortSignal): Promise<void> => {
     try {
