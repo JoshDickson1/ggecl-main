@@ -115,123 +115,48 @@ export class SocketService {
   private handleJoinGroups(socket: Socket): void {
     socket.on(
       "joinGroups",
-      async ({
-        groupIds,
-        studentId,
-        instructor,
-        admin,
-      }: {
-        groupIds: string[];
-        studentId?: string;
-        instructor?: string;
-        admin?: string;
-      }) => {
-        if (!studentId && !instructor && !admin) {
-          socket.emit(
-            "error",
-            "Student ID, instructor ID, or admin ID must be provided"
-          );
-          return;
-        }
+      ({ groupIds, studentId }: { groupIds: string[]; studentId: string }) => {
+        groupIds.forEach((groupId) => {
+          const group = this.groups[groupId];
 
-        for (const groupId of groupIds) {
-          let group = this.groups[groupId];
-
-          // If group doesn't exist in memory, fetch from database
-          if (!group) {
-            try {
-              const dbGroup = await Group.findOne({ groupId }).lean();
-              if (dbGroup) {
-                group = {
-                  admin: dbGroup.admin,
-                  name: dbGroup.name,
-                  students: dbGroup.students,
-                  instructors: dbGroup.instructors || [],
-                };
-                this.groups[groupId] = group;
-              }
-            } catch (err) {
-              console.error(`Failed to fetch group ${groupId} from DB`, err);
-              continue;
-            }
-          }
-
-          if (!group) {
-            // console.warn(`⚠️ Group ${groupId} does not exist`);
-            continue;
-          }
-
-          // Handle student joining
-          if (studentId && group.students) {
+          if (group) {
             if (!group.students.includes(studentId)) {
               group.students.push(studentId);
             }
+
             socket.join(groupId);
             // console.log(`👨‍🎓 Student ${studentId} joined group ${groupId}`);
-            // this.io.to(groupId).emit("message", {
-            //   from: "system",
-            //   text: `${studentId} has joined the group`,
-            // });
-          }
 
-          // Handle instructor joining
-          if (instructor && group.instructors) {
-            if (!group.instructors.includes(instructor)) {
-              group.instructors.push(instructor);
-            }
-            socket.join(groupId);
-            // console.log(`👨‍🏫 Instructor ${instructor} joined group ${groupId}`);
+            this.io.to(groupId).emit("message", {
+              from: "system",
+              text: `${studentId} has joined the group`,
+            });
+          } else {
+            // console.warn(`⚠️ Group ${groupId} does not exist`);
           }
-
-          // Handle admin joining (assuming specific admin ID for super admin)
-          if (admin && admin === "67fe79c80f4c4734f412abeb") {
-            socket.join(groupId);
-            // console.log(`👑 Admin ${admin} joined group ${groupId}`);
-          }
-        }
+        });
       }
     );
   }
 
   private handleSendMessage(socket: Socket): void {
-    console.log("groups before:", this.groups);
     socket.on("sendMessage", async (data: MessageData) => {
       const { groupId, senderId, role, sender, text, image } = data;
-      let group = this.groups[groupId];
-
-      // console.log("Message data:", data);
+      const group = this.groups[groupId];
 
       if ((!text || (typeof text === "string" && !text.trim())) && !image) {
         socket.emit("error", "Message or image must be provided");
         return;
       }
 
-      if (!group) {
-        const dbGroup = await Group.findOne({ groupId }).lean();
-        if (dbGroup) {
-          group = {
-            admin: dbGroup.admin,
-            name: dbGroup.name,
-            students: dbGroup.students,
-            instructors: dbGroup.instructors || [],
-          };
-          this.groups[groupId] = group;
-        }
-      }
-
-      console.log("Group :", group);
-
       if (
         group &&
-        ((role === "admin" && senderId === group.admin) ||
-          (role === "student" && group.students.includes(senderId)) ||
-          (role === "instructor" && group.instructors.includes(senderId)))
+        ((role === "admin" && group.admin === senderId) ||
+          (role === "student" && group.students.includes(senderId)))
       ) {
-        console.log({ senderId });
         const newMessage = new Message({
           group: groupId,
-          sender: role === "instructor" ? "Instructor" : sender,
-          senderId,
+          sender: senderId,
           role,
           text: text ? text.trim() : null,
           image: image || null,

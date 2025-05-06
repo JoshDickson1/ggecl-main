@@ -12,7 +12,6 @@ import verifyEmailRoutes from "./routes/emailVerifyRoutes.js";
 import sessionRoute from "./routes/sessionRoute.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import logoutRoute from "./routes/logoutRoute.js";
-import chatRouter from "./routes/chatRoute.js";
 
 // Configs & Middlewares
 import { errorHandler } from "./middlewares/errorHandler.js";
@@ -33,22 +32,9 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://ggecl-frontend.vercel.app",
-      ];
-
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: ["http://localhost:5173", "https://ggecl-frontend.vercel.app"],
   })
 );
-
 app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
@@ -62,7 +48,6 @@ app.use(`${ROUTE_PREFIX}`, verifyEmailRoutes);
 app.use(`${ROUTE_PREFIX}/refresh`, refresh);
 app.use(ROUTE_PREFIX, sessionRoute);
 app.use(`${ROUTE_PREFIX}`, logoutRoute);
-app.use(`${ROUTE_PREFIX}/chat`, chatRouter);
 
 app.use(
   `${ROUTE_PREFIX}/trpc`,
