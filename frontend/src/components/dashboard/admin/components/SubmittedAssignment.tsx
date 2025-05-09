@@ -17,17 +17,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDebounce } from "@/hooks/useDebounce";
+import { Assignment } from "@/utils/trpc";
 import { format } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { FaSearch } from "react-icons/fa";
-import { useIAssignments } from "../../admin/hooks/useIAssignments";
-import { AssignmentFilterStatusType } from "@/types/assignment";
+import { useISubmittedAssignments } from "../hooks/useISubmittedAssignments";
 
-type AssignmentFilterStatusTypeWithAll = AssignmentFilterStatusType | "All";
+interface SubmittedAssignmentProps {
+  onOpenModal: (assignment: Assignment) => void;
+}
 
-function GivenAssignment() {
-  const [statusFilter, setStatusFilter] =
-    useState<AssignmentFilterStatusTypeWithAll>("All");
+function SubmittedAssignment({ onOpenModal }: SubmittedAssignmentProps) {
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,11 +35,10 @@ function GivenAssignment() {
 
   const { debouncedValue } = useDebounce(searchTerm);
 
-  const { assignments, meta, loading } = useIAssignments({
+  const { assignments, meta, loading } = useISubmittedAssignments({
     page: currentPage,
     limit: rowsPerPage,
     search: debouncedValue,
-    status: statusFilter !== "All" ? statusFilter : undefined,
     dueDate: dateFilter,
   });
 
@@ -63,7 +62,7 @@ function GivenAssignment() {
       <div className="mb-4 flex flex-col items-center gap-4 md:flex-row md:justify-between">
         <div className="flex flex-col gap-3">
           <h1 className="text-xl font-semibold md:text-2xl">
-            Assignments you've given
+            Submitted Assignments
           </h1>
 
           <div className="relative">
@@ -78,26 +77,9 @@ function GivenAssignment() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4 md:flex-nowrap">
-          <Select
-            value={statusFilter}
-            onValueChange={(v) =>
-              setStatusFilter(v as AssignmentFilterStatusTypeWithAll)
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              {["All", "pending", "graded", "submitted"].map((s) => (
-                <SelectItem className="capitalize" key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Input
             type="date"
-            value={dateFilter?.toDateString()}
+            value={dateFilter?.toTimeString()}
             onChange={(e) => setDateFilter(new Date(e.target.value))}
           />
         </div>
@@ -107,7 +89,15 @@ function GivenAssignment() {
       <Table>
         <TableHeader>
           <TableRow>
-            {["Title", "Course", "Due Date", "Status", "Action"].map((h) => (
+            {[
+              "Title",
+              "Course",
+              "Due Date",
+              "Student",
+              "Status",
+              "Grade",
+              "Action",
+            ].map((h) => (
               <TableHead key={h}>{h}</TableHead>
             ))}
           </TableRow>
@@ -127,12 +117,22 @@ function GivenAssignment() {
                 <TableCell>
                   {format(new Date(a.dueDate), "dd-MM-yyyy")}
                 </TableCell>
+                <TableCell className="capitalize">
+                  {a?.studentId?.fullName}
+                </TableCell>
                 <TableCell className="capitalize">{a.status}</TableCell>
+                <TableCell>{a.grade ?? "N/A"}</TableCell>
                 <TableCell>
                   {a.status !== "graded" ? (
-                    "-"
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onOpenModal(a)}
+                    >
+                      Mark
+                    </Button>
                   ) : (
-                    <Button size="sm" variant="ghost" disabled>
+                    <Button color="green" size="sm" variant="ghost" disabled>
                       Graded
                     </Button>
                   )}
@@ -141,15 +141,15 @@ function GivenAssignment() {
             ))
           ) : (
             <TableRow>
-              <TableCell className="text-center italic" colSpan={6}>
-                No Assignments were found...
+              <TableCell className="text-center italic" colSpan={7}>
+                No Assignments has been submitted...
               </TableCell>
             </TableRow>
           )}
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={6}>Total: {assignments.length}</TableCell>
+            <TableCell colSpan={7}>Total: {assignments.length}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>
@@ -197,4 +197,4 @@ function GivenAssignment() {
   );
 }
 
-export default GivenAssignment;
+export default SubmittedAssignment;
