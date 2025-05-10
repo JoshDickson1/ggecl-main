@@ -127,6 +127,10 @@ const AdminSettings = lazy(
   () => import("@/components/dashboard/admin/pages/AdminSettings.tsx"),
 );
 
+const AssignmentAD = lazy(
+  () => import("@/components/dashboard/admin/pages/AssignmentAD.tsx"),
+);
+
 const AdminEditCourse = lazy(
   () => import("@/components/dashboard/admin/pages/EditCourse.tsx"),
 );
@@ -492,6 +496,14 @@ function App() {
             element={
               <Suspense fallback={<AuthPageLoading />}>
                 <AdminHome />
+              </Suspense>
+            }
+          />
+          <Route
+            path="assignments"
+            element={
+              <Suspense fallback={<AuthPageLoading />}>
+                <AssignmentAD />
               </Suspense>
             }
           />

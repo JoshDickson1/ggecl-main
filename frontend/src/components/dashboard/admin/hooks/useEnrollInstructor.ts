@@ -18,7 +18,7 @@ export function useEnrollInstructor() {
         queryClient.invalidateQueries({
           queryKey: trpc.instructor.getAll.queryKey(),
         });
-
+        
         queryClient.invalidateQueries({
           queryKey: trpc.instructor.getById.queryKey(),
         });

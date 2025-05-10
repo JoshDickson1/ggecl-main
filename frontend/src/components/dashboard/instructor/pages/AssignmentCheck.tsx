@@ -21,6 +21,7 @@ import MarkAssignmentModal, {
 } from "@/components/ui/MarkAssignmentModal";
 import GivenAssignment from "../_components/GivenAssignment";
 import SubmittedAssignment from "../_components/SubmittedAssignment";
+import AssignmentFromAdmin from "../_components/AssignmentFromAdmin";
 
 export default function AssignmentDashboard() {
   const { instructor } = useInstructor();
@@ -93,6 +94,7 @@ export default function AssignmentDashboard() {
       <main className="space-y-20 py-7">
         <GivenAssignment />
         <SubmittedAssignment onOpenModal={openModal} />
+        <AssignmentFromAdmin />
       </main>
 
       {/* Create Assignment */}

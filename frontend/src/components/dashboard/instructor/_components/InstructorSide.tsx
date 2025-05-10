@@ -56,7 +56,7 @@ import {
       icon: Calendar,
     },
     {
-      title: "Student Discussions",
+      title: "Classroom & Groups",
       url: `${urlPrefix}/chat`,
       icon: MessagesSquare,
     },

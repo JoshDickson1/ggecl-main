@@ -47,7 +47,12 @@ const menuItems: MenuItem[] = [
     icon: FileText,
   },
   {
-    title: "Student Discussions",
+    title: "Student Assignments",
+    url: `${urlPrefix}/assignments`,
+    icon: BookOpen,
+  },
+  {
+    title: "Classroom & Groups",
     url: `${urlPrefix}/chat`,
     icon: MessagesSquare,
   },

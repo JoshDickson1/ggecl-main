@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useInstructor } from "@/hooks/useInstructor";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { generateInitials } from "@/lib/generateInitial";
-import { useIAssignments } from "../hooks/useIAssignments";
+import { useIAssignments } from "../../admin/hooks/useIAssignments";
 
 interface CtaBannerProps {
   title: string;
