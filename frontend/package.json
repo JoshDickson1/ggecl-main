@@ -1,5 +1,5 @@
 {
-  "name": "@/ggecl-client",
+  "name": "ggecl-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",

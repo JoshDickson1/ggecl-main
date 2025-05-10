@@ -97,6 +97,10 @@ class AdminService {
       { new: true }
     );
   }
+
+  async getRole(admineRole: string) {
+    return Admin.findOne({ role: admineRole });
+  }
 }
 
 export const adminService = new AdminService();
