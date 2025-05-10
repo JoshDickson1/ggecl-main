@@ -68,9 +68,10 @@ const StudentInfo: React.FC = () => {
   const onSubmit = (data: StudentRegistrationForm) => {
     console.log("New Student Data:", data);
     enrollStudent(data);
-    setTimeout(() => {
-      reset();
-    }, 2000);
+    // setTimeout(() => {
+    // No need for setTimeout, as it does not wait for the POST request to finish
+    reset();
+    // }, 2000);
   };
 
   return (

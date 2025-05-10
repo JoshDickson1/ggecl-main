@@ -223,7 +223,7 @@ export const studentRouter = router({
 
         // send mail to student containing password and email
 
-        await sendMailToEmail({
+        const result = await sendMailToEmail({
           toEmail: studentEmail,
           html: enrollMail({
             email: studentEmail,
@@ -239,6 +239,8 @@ export const studentRouter = router({
           ),
           subject: ENROLL_EMAIL_SUBJECT,
         });
+
+        console.log("result ======>", result);
 
         return { success: true, student };
       } catch (error) {

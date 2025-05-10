@@ -57,8 +57,8 @@ const InstructorInfo: React.FC = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
     reset,
+    formState: { errors },
   } = useForm<InstructorRegistrationForm>({
     resolver: zodResolver(InstructorRegistrationSchema),
   });
@@ -67,15 +67,18 @@ const InstructorInfo: React.FC = () => {
   const onSubmit = (data: InstructorRegistrationForm) => {
     console.log("New Instructor Data:", data);
     enrollInstructor(data);
-    setTimeout(() => {
-      reset();
-    }, 2000);
+    // No need for setTimeout, as it may interrupt the POST request
+    // setTimeout(() => {
+    reset();
+    // }, 2000);
   };
 
   return (
     <div className="min-h-screen bg-white p-4 dark:bg-gray-900">
       <div className="mb-5 space-y-0.5">
-        <h1 className="text-3xl font-bold md:text-4xl">Instructor Management</h1>
+        <h1 className="text-3xl font-bold md:text-4xl">
+          Instructor Management
+        </h1>
         <p className="text-muted-foreground text-sm">
           veiw and manage instructors who teach at your school
         </p>

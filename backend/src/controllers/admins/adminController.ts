@@ -12,6 +12,7 @@ import {
 } from "../../utils/responseUtils.js";
 import { setRefreshTokenCookie } from "../../utils/cookieUtils.js";
 import { z } from "zod";
+import { handleUploadFile } from "../../utils/handleFileUpload.js";
 
 export const registerAdmin = async (req: Request, res: Response) => {
   try {
@@ -149,5 +150,37 @@ export const updateAdmin = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Update admin error:", error);
     createErrorResponse(res, 500, "Failed to update admin");
+  }
+};
+
+export const uploadFileTypes = async (
+  req: Request,
+  res: Response
+): Promise<any> => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    console.log("user --->", req.user);
+    // only admin can make a File Upload
+    const admin = await adminService.getRole(req.user.role);
+
+    if (admin.role !== "admin" && admin.role !== "superadmin") {
+      return createErrorResponse(res, 403, "Invalid admin role", [
+        { message: "INVALID_ADMIN_ROLE" },
+      ]);
+    }
+
+    const result = await handleUploadFile(req.file.buffer, "upload");
+
+    createSuccessResponse(res, 200, "Upload successful", {
+      url: result.secure_url,
+      type: result.resource_type,
+      original_filename: result.original_filename,
+    });
+  } catch (err: any) {
+    console.error("Upload error:", err);
+    createErrorResponse(res, 500, err.message || "Upload failed");
   }
 };
