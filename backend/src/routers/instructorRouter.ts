@@ -136,7 +136,7 @@ export const instructorRouter = router({
         wildcardDeleteCache("students-");
         wildcardDeleteCache("instructors-");
 
-        const result = await sendMailToEmail({
+        await sendMailToEmail({
           toEmail: instructorEmail,
           html: enrollMail({
             email: instructorEmail,
@@ -152,8 +152,6 @@ export const instructorRouter = router({
           ),
           subject: ENROLL_EMAIL_SUBJECT,
         });
-
-        console.log("result ======>", result);
 
         return { success: true, instructor };
       } catch (error) {
