@@ -1,19 +1,11 @@
-import nodeMailer, { Transporter } from "nodemailer";
+import nodemailer from "nodemailer";
 import { envConfig } from "../config/envValidator.js";
 
-// export const transporter: Transporter = nodeMailer.createTransport({
-//   host: envConfig.smtpHost,
-//   port: 465,
-//   auth: {
-//     user: envConfig.smtpUser,
-//     pass: envConfig.smtpPass,
-//   },
-// });
-
-export const transporter: Transporter = nodeMailer.createTransport({
-  service: "SendGrid",
+export const transporter = nodemailer.createTransport({
+  host: envConfig.smtpHost,
+  port: 465,
   auth: {
-    user: "apikey", // DO NOT change this
-    pass: envConfig.sendGridApiKey,
+    user: envConfig.smtpUser,
+    pass: envConfig.smtpPass,
   },
 });
